@@ -233,7 +233,7 @@ function updateLegend() {
 }
 
 // Load national tract data
-fetch("data/tracts.topojson")
+fetch("tracts.topojson")
   .then(response => {
     if (!response.ok) throw new Error("Cannot load tracts.topojson");
     return response.json();
@@ -272,7 +272,7 @@ fetch("data/tracts.topojson")
   });
 
 // Load provider locations
-fetch("data/providers.geojson")
+fetch("providers.geojson")
   .then(response => {
     if (!response.ok) throw new Error("Cannot load providers.geojson");
     return response.json();
