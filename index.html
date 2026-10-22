@@ -1,0 +1,309 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>National SPAR and SPAI Map</title>
+
+<link rel="stylesheet"
+ href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+
+<style>
+  html, body, #map {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+  }
+
+  .map-control {
+    background: white;
+    padding: 12px;
+    border-radius: 5px;
+    box-shadow: 0 1px 6px #888;
+    font: 13px Arial, sans-serif;
+  }
+
+  .map-control label {
+    display: block;
+    margin: 7px 0;
+    cursor: pointer;
+  }
+
+  .legend {
+    background: white;
+    padding: 10px;
+    border-radius: 5px;
+    font: 12px Arial, sans-serif;
+    min-width: 180px;
+    box-shadow: 0 1px 6px #888;
+  }
+
+  .legend-bar {
+    height: 14px;
+    margin: 8px 0 5px;
+  }
+
+  .legend-labels {
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .status {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1000;
+    background: white;
+    padding: 10px;
+    font: 13px Arial, sans-serif;
+  }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+</head>
+
+<body>
+<div id="map"></div>
+<div id="status" class="status">Loading national map...</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/topojson-client@3/dist/topojson-client.min.js"></script>
+
+<script>
+const map = L.map("map", {
+  preferCanvas: true,
+  zoomControl: true
+}).setView([39.5, -98.5], 4);
+
+L.tileLayer(
+  "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+  {
+    attribution: '&copy; OpenStreetMap contributors',
+    maxZoom: 19
+  }
+).addTo(map);
+
+let currentLayer = "SPAR";
+let tractLayer;
+let providerLayer = L.layerGroup().addTo(map);
+let showProviders = true;
+let spaiMax = 1;
+
+function numeric(value) {
+  return Number(value);
+}
+
+function getColor(value, type) {
+  if (value === null || value === undefined ||
+      !Number.isFinite(numeric(value))) {
+    return "transparent";
+  }
+
+  if (type === "SPAR") {
+    const scaled = Math.max(0, Math.min(numeric(value), 5)) / 5;
+    return d3.interpolateViridis(scaled);
+  }
+
+  const scaled = Math.max(0, Math.min(numeric(value) / spaiMax, 1));
+  return d3.interpolateMagma(scaled);
+}
+
+function tractStyle(feature) {
+  const p = feature.properties;
+
+  return {
+    color: "#ffffff",
+    weight: 0.25,
+    opacity: 0.65,
+    fillColor: getColor(p[currentLayer], currentLayer),
+    fillOpacity: 0.8
+  };
+}
+
+function formatSPAI(value) {
+  if (value == null) return "NA";
+  return Number(value).toExponential(3);
+}
+
+function tractPopup(feature) {
+  const p = feature.properties;
+
+  return `
+    <b>FIPS Code:</b> ${p.FIPS}<br>
+    <b>SPAR:</b> ${Number(p.SPAR).toFixed(2)}<br>
+    <b>SPAI:</b> ${formatSPAI(p.SPAI)}<br>
+    <b>Census Tract Population:</b>
+    ${Number(p.POPULATION).toLocaleString()}
+  `;
+}
+
+// Layer controls
+const layerControl = L.control({position: "topleft"});
+
+layerControl.onAdd = function() {
+  const div = L.DomUtil.create("div", "map-control");
+
+  div.innerHTML = `
+    <b>Accessibility Measure</b>
+    <label><input type="radio" name="measure"
+      value="SPAR" checked> SPAR</label>
+    <label><input type="radio" name="measure"
+      value="SPAI"> SPAI</label>
+    <hr>
+    <label><input type="checkbox" id="providersToggle"
+      checked> Provider locations</label>
+  `;
+
+  L.DomEvent.disableClickPropagation(div);
+  L.DomEvent.disableScrollPropagation(div);
+
+  div.querySelectorAll('input[name="measure"]').forEach(input => {
+    input.addEventListener("change", function() {
+      currentLayer = this.value;
+
+      if (tractLayer) {
+        tractLayer.setStyle(tractStyle);
+      }
+
+      updateLegend();
+    });
+  });
+
+  div.querySelector("#providersToggle").addEventListener(
+    "change", function() {
+      showProviders = this.checked;
+
+      if (showProviders) {
+        providerLayer.addTo(map);
+      } else {
+        map.removeLayer(providerLayer);
+      }
+    }
+  );
+
+  return div;
+};
+
+layerControl.addTo(map);
+
+// Dynamic legend
+const legend = L.control({position: "topright"});
+let legendDiv;
+
+legend.onAdd = function() {
+  legendDiv = L.DomUtil.create("div", "legend");
+  updateLegend();
+  return legendDiv;
+};
+
+legend.addTo(map);
+
+function updateLegend() {
+  if (!legendDiv) return;
+
+  const isSPAR = currentLayer === "SPAR";
+  const maxValue = isSPAR ? 5 : spaiMax;
+  const palette = isSPAR ? d3.interpolateViridis : d3.interpolateMagma;
+
+  const colors = Array.from(
+    {length: 101},
+    (_, i) => palette(i / 100)
+  );
+
+  const gradient = `linear-gradient(to right, ${colors.join(",")})`;
+
+  let labels;
+
+  if (isSPAR) {
+    labels = ["0", "1", "2", "3", "4", "5+"];
+  } else {
+    labels = [0, 0.25, 0.5, 0.75, 1].map(
+      x => (x * maxValue * 1e5).toFixed(2)
+    );
+  }
+
+  legendDiv.innerHTML = `
+    <b>${isSPAR ? "SPAR (5+ capped)" : "SPAI (× 10⁻⁵)"}</b>
+    <div class="legend-bar" style="background:${gradient}"></div>
+    <div class="legend-labels">
+      ${labels.map(x => `<span>${x}</span>`).join("")}
+    </div>
+  `;
+}
+
+// Load national tract data
+fetch("data/tracts.topojson")
+  .then(response => {
+    if (!response.ok) throw new Error("Cannot load tracts.topojson");
+    return response.json();
+  })
+  .then(topology => {
+    const objectName = Object.keys(topology.objects)[0];
+
+    const geojson = topojson.feature(
+      topology,
+      topology.objects[objectName]
+    );
+
+    // Use the full SPAI range, matching the original palette
+    spaiMax = Math.max(
+      ...geojson.features.map(f => Number(f.properties.SPAI) || 0)
+    );
+
+    if (spaiMax <= 0) spaiMax = 1;
+
+    tractLayer = L.geoJSON(geojson, {
+      renderer: L.canvas({padding: 0.5}),
+      style: tractStyle,
+      onEachFeature: function(feature, layer) {
+        layer.bindPopup(() => tractPopup(feature));
+      }
+    }).addTo(map);
+
+    updateLegend();
+
+    document.getElementById("status").style.display = "none";
+  })
+  .catch(error => {
+    document.getElementById("status").textContent =
+      "Error loading tract data: " + error.message;
+    console.error(error);
+  });
+
+// Load provider locations
+fetch("data/providers.geojson")
+  .then(response => {
+    if (!response.ok) throw new Error("Cannot load providers.geojson");
+    return response.json();
+  })
+  .then(geojson => {
+    providerLayer = L.geoJSON(geojson, {
+      pointToLayer: function(feature, latlng) {
+        return L.circleMarker(latlng, {
+          radius: 4,
+          color: "blue",
+          stroke: false,
+          fillOpacity: 0.8,
+          renderer: L.canvas()
+        });
+      },
+      onEachFeature: function(feature, layer) {
+        const p = feature.properties;
+
+        layer.bindPopup(`
+          <b>Provider Location</b><br>
+          <b>FIPS Tract:</b> ${p.GEOID}<br>
+          <b>Weighted Provider Count:</b>
+          ${Number(p.weighted_provider_count).toFixed(3)}
+        `);
+      }
+    });
+
+    if (showProviders) providerLayer.addTo(map);
+  })
+  .catch(console.error);
+</script>
+</body>
+</html>
+
