@@ -2,307 +2,576 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>National SPAR and SPAI Map</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>National SPAR and SPAI Map</title>
 
-<link rel="stylesheet"
- href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link href="https://unpkg.com/maplibre-gl@5.6.2/dist/maplibre-gl.css"
+        rel="stylesheet">
 
-<style>
-  html, body, #map {
-    width: 100%;
-    height: 100%;
-    margin: 0;
-  }
+  <script src="https://unpkg.com/maplibre-gl@5.6.2/dist/maplibre-gl.js"></script>
+  <script src="https://unpkg.com/pmtiles@4.3.0/dist/pmtiles.js"></script>
 
-  .map-control {
-    background: white;
-    padding: 12px;
-    border-radius: 5px;
-    box-shadow: 0 1px 6px #888;
-    font: 13px Arial, sans-serif;
-  }
+  <style>
+    body { margin: 0; font-family: Arial, sans-serif; }
+    #map { position: absolute; inset: 0; }
 
-  .map-control label {
-    display: block;
-    margin: 7px 0;
-    cursor: pointer;
-  }
+    .controls {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      z-index: 2;
+      background: white;
+      padding: 14px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px #0003;
+      max-width: 245px;
+    }
 
-  .legend {
-    background: white;
-    padding: 10px;
-    border-radius: 5px;
-    font: 12px Arial, sans-serif;
-    min-width: 180px;
-    box-shadow: 0 1px 6px #888;
-  }
-
-  .legend-bar {
-    height: 14px;
-    margin: 8px 0 5px;
-  }
-
-  .legend-labels {
-    display: flex;
-    justify-content: space-between;
-  }
-
-  .status {
-    position: absolute;
-    bottom: 20px;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 1000;
-    background: white;
-    padding: 10px;
-    font: 13px Arial, sans-serif;
-  }
-</style>
-<script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+    .controls h3 { margin: 0 0 10px; font-size: 15px; }
+    .controls label { display: block; margin: 8px 0; }
+    .legend { margin-top: 14px; font-size: 12px; }
+    .gradient {
+      height: 14px;
+      margin: 6px 0;
+      border: 1px solid #aaa;
+    }
+    .ticks { display: flex; justify-content: space-between; }
+  </style>
 </head>
 
 <body>
 <div id="map"></div>
-<div id="status" class="status">Loading national map...</div>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://unpkg.com/topojson-client@3/dist/topojson-client.min.js"></script>
+<div class="controls">
+  <h3>National Healthcare Accessibility</h3>
+
+  <label>
+    <input type="radio" name="metric" value="SPAR" checked>
+    SPAR
+  </label>
+
+  <label>
+    <input type="radio" name="metric" value="SPAI">
+    SPAI
+  </label>
+
+  <label>
+    <input type="checkbox" id="providers" checked>
+    Show provider locations
+  </label>
+  <label>
+  <input type="checkbox" id="cities" checked>
+  Show city names
+</label>
+
+<label>
+  <input type="checkbox" id="states" checked>
+  Show state borders
+</label>
+
+<label>
+  <input type="checkbox" id="tracts" checked>
+  Show census tract borders
+</label>
+
+  <div id="legend" class="legend"></div>
+</div>
 
 <script>
-const map = L.map("map", {
-  preferCanvas: true,
-  zoomControl: true
-}).setView([39.5, -98.5], 4);
+  const protocol = new pmtiles.Protocol();
+  maplibregl.addProtocol("pmtiles", protocol.tile);
 
-L.tileLayer(
-  "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-  {
-    attribution: '&copy; OpenStreetMap contributors',
-    maxZoom: 19
+  const tilesURL = new URL(
+    "national-tracts.pmtiles",
+    window.location.href
+  ).href;
+
+  const map = new maplibregl.Map({
+    container: "map",
+    center: [-96, 38],
+    zoom: 3.5,
+    minZoom: 2,
+    maxZoom: 14,
+    style: {
+      version: 8,
+      glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
+      sources: {
+        states: {
+  type: "geojson",
+  data: "https://raw.githubusercontent.com/PublicaMundi/MappingAPI/master/data/geojson/us-states.json"
+},
+ cities: {
+  type: "geojson",
+  data: {
+    type: "FeatureCollection",
+    features: [
+
+      // ==========================================
+      // STATE CAPITALS (CONTIGUOUS UNITED STATES)
+      // ==========================================
+
+      { type: "Feature", properties: { name: "Montgomery" },
+        geometry: { type: "Point", coordinates: [-86.3000, 32.3668] } },
+
+      { type: "Feature", properties: { name: "Phoenix" },
+        geometry: { type: "Point", coordinates: [-112.0740, 33.4484] } },
+
+      { type: "Feature", properties: { name: "Little Rock" },
+        geometry: { type: "Point", coordinates: [-92.2896, 34.7465] } },
+
+      { type: "Feature", properties: { name: "Sacramento" },
+        geometry: { type: "Point", coordinates: [-121.4944, 38.5816] } },
+
+      { type: "Feature", properties: { name: "Denver" },
+        geometry: { type: "Point", coordinates: [-104.9903, 39.7392] } },
+
+      { type: "Feature", properties: { name: "Hartford" },
+        geometry: { type: "Point", coordinates: [-72.6851, 41.7637] } },
+
+      { type: "Feature", properties: { name: "Dover" },
+        geometry: { type: "Point", coordinates: [-75.5244, 39.1582] } },
+
+      { type: "Feature", properties: { name: "Tallahassee" },
+        geometry: { type: "Point", coordinates: [-84.2807, 30.4383] } },
+
+      { type: "Feature", properties: { name: "Atlanta" },
+        geometry: { type: "Point", coordinates: [-84.3880, 33.7490] } },
+
+      { type: "Feature", properties: { name: "Boise" },
+        geometry: { type: "Point", coordinates: [-116.2023, 43.6150] } },
+
+      { type: "Feature", properties: { name: "Springfield" },
+        geometry: { type: "Point", coordinates: [-89.6501, 39.7817] } },
+
+      { type: "Feature", properties: { name: "Indianapolis" },
+        geometry: { type: "Point", coordinates: [-86.1581, 39.7684] } },
+
+      { type: "Feature", properties: { name: "Des Moines" },
+        geometry: { type: "Point", coordinates: [-93.6250, 41.5868] } },
+
+      { type: "Feature", properties: { name: "Topeka" },
+        geometry: { type: "Point", coordinates: [-95.6890, 39.0473] } },
+
+      { type: "Feature", properties: { name: "Frankfort" },
+        geometry: { type: "Point", coordinates: [-84.8733, 38.2009] } },
+
+      { type: "Feature", properties: { name: "Baton Rouge" },
+        geometry: { type: "Point", coordinates: [-91.1403, 30.4515] } },
+
+      { type: "Feature", properties: { name: "Augusta" },
+        geometry: { type: "Point", coordinates: [-69.7795, 44.3106] } },
+
+      { type: "Feature", properties: { name: "Annapolis" },
+        geometry: { type: "Point", coordinates: [-76.4922, 38.9784] } },
+
+      { type: "Feature", properties: { name: "Boston" },
+        geometry: { type: "Point", coordinates: [-71.0589, 42.3601] } },
+
+      { type: "Feature", properties: { name: "Lansing" },
+        geometry: { type: "Point", coordinates: [-84.5555, 42.7325] } },
+
+      { type: "Feature", properties: { name: "Saint Paul" },
+        geometry: { type: "Point", coordinates: [-93.0900, 44.9537] } },
+
+      { type: "Feature", properties: { name: "Jackson" },
+        geometry: { type: "Point", coordinates: [-90.1848, 32.2988] } },
+
+      { type: "Feature", properties: { name: "Jefferson City" },
+        geometry: { type: "Point", coordinates: [-92.1735, 38.5767] } },
+
+      { type: "Feature", properties: { name: "Helena" },
+        geometry: { type: "Point", coordinates: [-112.0391, 46.5884] } },
+
+      { type: "Feature", properties: { name: "Lincoln" },
+        geometry: { type: "Point", coordinates: [-96.7026, 40.8136] } },
+
+      { type: "Feature", properties: { name: "Carson City" },
+        geometry: { type: "Point", coordinates: [-119.7674, 39.1638] } },
+
+      { type: "Feature", properties: { name: "Concord" },
+        geometry: { type: "Point", coordinates: [-71.5376, 43.2081] } },
+
+      { type: "Feature", properties: { name: "Trenton" },
+        geometry: { type: "Point", coordinates: [-74.7429, 40.2171] } },
+
+      { type: "Feature", properties: { name: "Santa Fe" },
+        geometry: { type: "Point", coordinates: [-105.9378, 35.6870] } },
+
+      { type: "Feature", properties: { name: "Albany" },
+        geometry: { type: "Point", coordinates: [-73.7562, 42.6526] } },
+
+      { type: "Feature", properties: { name: "Raleigh" },
+        geometry: { type: "Point", coordinates: [-78.6382, 35.7796] } },
+
+      { type: "Feature", properties: { name: "Bismarck" },
+        geometry: { type: "Point", coordinates: [-100.7837, 46.8083] } },
+
+      { type: "Feature", properties: { name: "Columbus" },
+        geometry: { type: "Point", coordinates: [-82.9988, 39.9612] } },
+
+      { type: "Feature", properties: { name: "Oklahoma City" },
+        geometry: { type: "Point", coordinates: [-97.5164, 35.4676] } },
+
+      { type: "Feature", properties: { name: "Salem" },
+        geometry: { type: "Point", coordinates: [-123.0351, 44.9429] } },
+
+      { type: "Feature", properties: { name: "Harrisburg" },
+        geometry: { type: "Point", coordinates: [-76.8844, 40.2732] } },
+
+      { type: "Feature", properties: { name: "Providence" },
+        geometry: { type: "Point", coordinates: [-71.4128, 41.8240] } },
+
+      { type: "Feature", properties: { name: "Columbia" },
+        geometry: { type: "Point", coordinates: [-81.0348, 34.0007] } },
+
+      { type: "Feature", properties: { name: "Pierre" },
+        geometry: { type: "Point", coordinates: [-100.3510, 44.3683] } },
+
+      { type: "Feature", properties: { name: "Nashville" },
+        geometry: { type: "Point", coordinates: [-86.7816, 36.1627] } },
+
+      { type: "Feature", properties: { name: "Austin" },
+        geometry: { type: "Point", coordinates: [-97.7431, 30.2672] } },
+
+      { type: "Feature", properties: { name: "Salt Lake City" },
+        geometry: { type: "Point", coordinates: [-111.8910, 40.7608] } },
+
+      { type: "Feature", properties: { name: "Montpelier" },
+        geometry: { type: "Point", coordinates: [-72.5754, 44.2601] } },
+
+      { type: "Feature", properties: { name: "Richmond" },
+        geometry: { type: "Point", coordinates: [-77.4360, 37.5407] } },
+
+      { type: "Feature", properties: { name: "Olympia" },
+        geometry: { type: "Point", coordinates: [-122.9007, 47.0379] } },
+
+      { type: "Feature", properties: { name: "Charleston" },
+        geometry: { type: "Point", coordinates: [-81.6326, 38.3498] } },
+
+      { type: "Feature", properties: { name: "Madison" },
+        geometry: { type: "Point", coordinates: [-89.4012, 43.0731] } },
+
+      { type: "Feature", properties: { name: "Cheyenne" },
+        geometry: { type: "Point", coordinates: [-104.8202, 41.1400] } },
+
+      // ==========================================
+      // WASHINGTON, DC
+      // ==========================================
+
+      { type: "Feature", properties: { name: "Washington, DC" },
+        geometry: { type: "Point", coordinates: [-77.0369, 38.9072] } },
+
+      // ==========================================
+      // ADDITIONAL MAJOR CITIES
+      // ==========================================
+
+      { type: "Feature", properties: { name: "New York" },
+        geometry: { type: "Point", coordinates: [-74.0060, 40.7128] } },
+
+      { type: "Feature", properties: { name: "Los Angeles" },
+        geometry: { type: "Point", coordinates: [-118.2437, 34.0522] } },
+
+      { type: "Feature", properties: { name: "Chicago" },
+        geometry: { type: "Point", coordinates: [-87.6298, 41.8781] } },
+
+      { type: "Feature", properties: { name: "Houston" },
+        geometry: { type: "Point", coordinates: [-95.3698, 29.7604] } },
+
+      { type: "Feature", properties: { name: "Philadelphia" },
+        geometry: { type: "Point", coordinates: [-75.1652, 39.9526] } },
+
+      { type: "Feature", properties: { name: "Pittsburgh" },
+        geometry: { type: "Point", coordinates: [-79.9959, 40.4406] } },
+
+      { type: "Feature", properties: { name: "Miami" },
+        geometry: { type: "Point", coordinates: [-80.1918, 25.7617] } },
+
+      { type: "Feature", properties: { name: "Dallas" },
+        geometry: { type: "Point", coordinates: [-96.7970, 32.7767] } },
+
+      { type: "Feature", properties: { name: "Seattle" },
+        geometry: { type: "Point", coordinates: [-122.3321, 47.6062] } },
+
+      { type: "Feature", properties: { name: "San Francisco" },
+        geometry: { type: "Point", coordinates: [-122.4194, 37.7749] } }
+
+    ]
   }
-).addTo(map);
-
-let currentLayer = "SPAR";
-let tractLayer;
-let providerLayer = L.layerGroup().addTo(map);
-let showProviders = true;
-let spaiMax = 1;
-
-function numeric(value) {
-  return Number(value);
-}
-
-function getColor(value, type) {
-  if (value === null || value === undefined ||
-      !Number.isFinite(numeric(value))) {
-    return "transparent";
-  }
-
-  if (type === "SPAR") {
-    const scaled = Math.max(0, Math.min(numeric(value), 5)) / 5;
-    return d3.interpolateViridis(scaled);
-  }
-
-  const scaled = Math.max(0, Math.min(numeric(value) / spaiMax, 1));
-  return d3.interpolateMagma(scaled);
-}
-
-function tractStyle(feature) {
-  const p = feature.properties;
-
-  return {
-    color: "#ffffff",
-    weight: 0.25,
-    opacity: 0.65,
-    fillColor: getColor(p[currentLayer], currentLayer),
-    fillOpacity: 0.8
-  };
-}
-
-function formatSPAI(value) {
-  if (value == null) return "NA";
-  return Number(value).toExponential(3);
-}
-
-function tractPopup(feature) {
-  const p = feature.properties;
-
-  return `
-    <b>FIPS Code:</b> ${p.FIPS}<br>
-    <b>SPAR:</b> ${Number(p.SPAR).toFixed(2)}<br>
-    <b>SPAI:</b> ${formatSPAI(p.SPAI)}<br>
-    <b>Census Tract Population:</b>
-    ${Number(p.POPULATION).toLocaleString()}
-  `;
-}
-
-// Layer controls
-const layerControl = L.control({position: "topleft"});
-
-layerControl.onAdd = function() {
-  const div = L.DomUtil.create("div", "map-control");
-
-  div.innerHTML = `
-    <b>Accessibility Measure</b>
-    <label><input type="radio" name="measure"
-      value="SPAR" checked> SPAR</label>
-    <label><input type="radio" name="measure"
-      value="SPAI"> SPAI</label>
-    <hr>
-    <label><input type="checkbox" id="providersToggle"
-      checked> Provider locations</label>
-  `;
-
-  L.DomEvent.disableClickPropagation(div);
-  L.DomEvent.disableScrollPropagation(div);
-
-  div.querySelectorAll('input[name="measure"]').forEach(input => {
-    input.addEventListener("change", function() {
-      currentLayer = this.value;
-
-      if (tractLayer) {
-        tractLayer.setStyle(tractStyle);
-      }
-
-      updateLegend();
-    });
-  });
-
-  div.querySelector("#providersToggle").addEventListener(
-    "change", function() {
-      showProviders = this.checked;
-
-      if (showProviders) {
-        providerLayer.addTo(map);
-      } else {
-        map.removeLayer(providerLayer);
-      }
-    }
-  );
-
-  return div;
-};
-
-layerControl.addTo(map);
-
-// Dynamic legend
-const legend = L.control({position: "topright"});
-let legendDiv;
-
-legend.onAdd = function() {
-  legendDiv = L.DomUtil.create("div", "legend");
-  updateLegend();
-  return legendDiv;
-};
-
-legend.addTo(map);
-
-function updateLegend() {
-  if (!legendDiv) return;
-
-  const isSPAR = currentLayer === "SPAR";
-  const maxValue = isSPAR ? 5 : spaiMax;
-  const palette = isSPAR ? d3.interpolateViridis : d3.interpolateMagma;
-
-  const colors = Array.from(
-    {length: 101},
-    (_, i) => palette(i / 100)
-  );
-
-  const gradient = `linear-gradient(to right, ${colors.join(",")})`;
-
-  let labels;
-
-  if (isSPAR) {
-    labels = ["0", "1", "2", "3", "4", "5+"];
-  } else {
-    labels = [0, 0.25, 0.5, 0.75, 1].map(
-      x => (x * maxValue * 1e5).toFixed(2)
-    );
-  }
-
-  legendDiv.innerHTML = `
-    <b>${isSPAR ? "SPAR (5+ capped)" : "SPAI (× 10⁻⁵)"}</b>
-    <div class="legend-bar" style="background:${gradient}"></div>
-    <div class="legend-labels">
-      ${labels.map(x => `<span>${x}</span>`).join("")}
-    </div>
-  `;
-}
-
-// Load national tract data
-fetch("tracts.topojson")
-  .then(response => {
-    if (!response.ok) throw new Error("Cannot load tracts.topojson");
-    return response.json();
-  })
-  .then(topology => {
-    const objectName = Object.keys(topology.objects)[0];
-
-    const geojson = topojson.feature(
-      topology,
-      topology.objects[objectName]
-    );
-
-    // Use the full SPAI range, matching the original palette
-    spaiMax = Math.max(
-      ...geojson.features.map(f => Number(f.properties.SPAI) || 0)
-    );
-
-    if (spaiMax <= 0) spaiMax = 1;
-
-    tractLayer = L.geoJSON(geojson, {
-      renderer: L.canvas({padding: 0.5}),
-      style: tractStyle,
-      onEachFeature: function(feature, layer) {
-        layer.bindPopup(() => tractPopup(feature));
-      }
-    }).addTo(map);
-
-    updateLegend();
-
-    document.getElementById("status").style.display = "none";
-  })
-  .catch(error => {
-    document.getElementById("status").textContent =
-      "Error loading tract data: " + error.message;
-    console.error(error);
-  });
-
-// Load provider locations
-fetch("providers.geojson")
-  .then(response => {
-    if (!response.ok) throw new Error("Cannot load providers.geojson");
-    return response.json();
-  })
-  .then(geojson => {
-    providerLayer = L.geoJSON(geojson, {
-      pointToLayer: function(feature, latlng) {
-        return L.circleMarker(latlng, {
-          radius: 4,
-          color: "blue",
-          stroke: false,
-          fillOpacity: 0.8,
-          renderer: L.canvas()
-        });
+},
+        osm: {
+          type: "raster",
+          tiles: [
+            "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+          ],
+          tileSize: 256,
+          attribution: "© OpenStreetMap contributors"
+        },
+        tracts: {
+          type: "vector",
+          url: "pmtiles://" + tilesURL
+        },
+        providers: {
+          type: "geojson",
+          data: "providers.geojson"
+        }
       },
-      onEachFeature: function(feature, layer) {
-        const p = feature.properties;
+      layers: [
+        {
+          id: "basemap",
+          type: "raster",
+          source: "osm"
+        }
+      ]
+    }
+  });
 
-        layer.bindPopup(`
-          <b>Provider Location</b><br>
-          <b>FIPS Tract:</b> ${p.GEOID}<br>
-          <b>Weighted Provider Count:</b>
-          ${Number(p.weighted_provider_count).toFixed(3)}
-        `);
+  const sparColors = [
+    "#440154", "#414487", "#2a788e",
+    "#22a884", "#7ad151", "#fde725"
+  ];
+
+  const spaiColors = [
+    "#000004", "#3b0f70", "#8c2981",
+    "#de4968", "#fe9f6d", "#fcfdbf"
+  ];
+
+  function sparPaint() {
+    return [
+      "interpolate", ["linear"],
+      ["min", ["max", ["to-number", ["get", "SPAR"], 0], 0], 5],
+      0, sparColors[0],
+      1, sparColors[1],
+      2, sparColors[2],
+      3, sparColors[3],
+      4, sparColors[4],
+      5, sparColors[5]
+    ];
+  }
+
+  function spaiPaint() {
+    return [
+      "interpolate", ["linear"],
+      ["max", ["to-number", ["get", "SPAI"], 0], 0],
+      0, spaiColors[0],
+      0.00001, spaiColors[1],
+      0.00002, spaiColors[2],
+      0.00003, spaiColors[3],
+      0.00004, spaiColors[4],
+      0.00005, spaiColors[5]
+    ];
+  }
+
+  function updateLegend(metric) {
+    const colors = metric === "SPAR" ? sparColors : spaiColors;
+
+    const labels = metric === "SPAR"
+      ? ["0", "1", "2", "3", "4", "5+"]
+      : ["0", "1", "2", "3", "4", "5+"];
+
+    document.getElementById("legend").innerHTML = `
+      <strong>${metric}</strong>
+      ${metric === "SPAI" ? "<div>SPAI (× 10⁻⁵)</div>" : ""}
+      <div class="gradient"
+           style="background:linear-gradient(to right,${colors.join(",")})">
+      </div>
+      <div class="ticks">
+        ${labels.map(x => `<span>${x}</span>`).join("")}
+      </div>
+    `;
+  }
+
+  map.on("load", () => {
+    map.addLayer({
+      id: "tract-fill",
+      type: "fill",
+      source: "tracts",
+      "source-layer": "tracts",
+      paint: {
+        "fill-color": sparPaint(),
+        "fill-opacity": 0.82
       }
     });
 
-    if (showProviders) providerLayer.addTo(map);
-  })
-  .catch(console.error);
+   map.addLayer({
+  id: "tract-outline",
+  type: "line",
+  source: "tracts",
+  "source-layer": "tracts",
+
+  // Only show tract boundaries when zoomed in
+  minzoom: 7,
+
+  paint: {
+    "line-color": "#FFFFFF",
+    "line-width": 0.5,
+    "line-opacity": 0.7
+  }
+});
+    // White state borders
+map.addLayer({
+  id: "state-borders",
+  type: "line",
+  source: "states",
+  paint: {
+    "line-color": "#FFFFFF",
+    "line-width": [
+      "interpolate",
+      ["linear"],
+      ["zoom"],
+      3, 1.2,
+      6, 1.8,
+      10, 2.2
+    ],
+    "line-opacity": 0.95
+  }
+});
+    // White city names
+map.addLayer({
+  id: "city-labels",
+  type: "symbol",
+  source: "cities",
+
+  layout: {
+    "text-field": ["get", "name"],
+    "text-size": [
+      "interpolate",
+      ["linear"],
+      ["zoom"],
+      3, 10,
+      6, 13,
+      10, 15
+    ],
+    "text-font": ["Open Sans Regular", "Arial Unicode MS Regular"],
+    "text-anchor": "center",
+    "text-offset": [0, 0.8],
+    "text-allow-overlap": false
+  },
+
+  paint: {
+    "text-color": "#FFFFFF",
+    "text-halo-color": "#333333",
+    "text-halo-width": 1.5
+  }
+});
+    map.addLayer({
+      id: "provider-points",
+      type: "circle",
+      source: "providers",
+      paint: {
+        "circle-radius": 3.5,
+        "circle-color": "#1675df",
+        "circle-stroke-color": "#ffffff",
+        "circle-stroke-width": 0.7
+      }
+    });
+
+    updateLegend("SPAR");
+// Show provider information when a blue dot is clicked
+map.on("click", "provider-points", e => {
+  const p = e.features[0].properties;
+
+  new maplibregl.Popup()
+    .setLngLat(e.lngLat)
+    .setHTML(`
+      <strong>Provider Location</strong>
+      <div>GEOID: ${p.GEOID ?? "NA"}</div>
+      <div>Weighted provider count: ${p.weighted_provider_count ?? "NA"}</div>
+    `)
+    .addTo(map);
+});
+
+// Change cursor when hovering over provider dots
+map.on("mouseenter", "provider-points", () => {
+  map.getCanvas().style.cursor = "pointer";
+});
+
+map.on("mouseleave", "provider-points", () => {
+  map.getCanvas().style.cursor = "";
+});
+    map.on("click", "tract-fill", e => {
+
+  // Do not show a tract popup if a provider dot was clicked
+  if (map.queryRenderedFeatures(e.point, {
+    layers: ["provider-points"]
+  }).length > 0) {
+    return;
+  }
+
+  const p = e.features[0].properties;
+
+      new maplibregl.Popup()
+        .setLngLat(e.lngLat)
+        .setHTML(`
+          <strong>Census Tract: ${p.FIPS ?? "Unknown"}</strong>
+          <div>SPAR: ${p.SPAR ?? "NA"}</div>
+          <div>SPAI: ${p.SPAI ?? "NA"}</div>
+          <div>Population: ${p.POPULATION ?? "NA"}</div>
+        `)
+        .addTo(map);
+    });
+
+    map.on("mouseenter", "tract-fill", () => {
+      map.getCanvas().style.cursor = "pointer";
+    });
+
+    map.on("mouseleave", "tract-fill", () => {
+      map.getCanvas().style.cursor = "";
+    });
+
+    document.querySelectorAll('input[name="metric"]')
+      .forEach(input => {
+        input.addEventListener("change", () => {
+          const metric = input.value;
+          map.setPaintProperty(
+            "tract-fill",
+            "fill-color",
+            metric === "SPAR" ? sparPaint() : spaiPaint()
+          );
+          updateLegend(metric);
+        });
+      });
+
+    document.getElementById("providers")
+      .addEventListener("change", e => {
+        map.setLayoutProperty(
+          "provider-points",
+          "visibility",
+          e.target.checked ? "visible" : "none"
+        );
+      });
+    // Toggle city names
+document.getElementById("cities")
+  .addEventListener("change", e => {
+    map.setLayoutProperty(
+      "city-labels",
+      "visibility",
+      e.target.checked ? "visible" : "none"
+    );
+  });
+
+// Toggle state borders
+document.getElementById("states")
+  .addEventListener("change", e => {
+    map.setLayoutProperty(
+      "state-borders",
+      "visibility",
+      e.target.checked ? "visible" : "none"
+    );
+  });
+
+// Toggle census tract borders
+document.getElementById("tracts")
+  .addEventListener("change", e => {
+    map.setLayoutProperty(
+      "tract-outline",
+      "visibility",
+      e.target.checked ? "visible" : "none"
+    );
+  });
+  });
+
+  map.addControl(new maplibregl.NavigationControl(), "top-right");
 </script>
 </body>
 </html>
