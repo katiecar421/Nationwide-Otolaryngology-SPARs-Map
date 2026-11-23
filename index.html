@@ -493,7 +493,16 @@ map.addLayer({
 
     map.on("click", "tract-fill", (e) => {
 
-      const p = e.features[0].properties;
+  // Don't open a census tract popup when clicking a provider
+  const providerClicked = map.queryRenderedFeatures(e.point, {
+    layers: ["ent-provider-points"]
+  });
+
+  if (providerClicked.length > 0) {
+    return;
+  }
+
+  const p = e.features[0].properties;
 
       const available =
         p.ISOCHRONE_AVAILABLE === true ||
@@ -652,6 +661,7 @@ map.addLayer({
 
 </body>
 </html>
+
 
 
 
