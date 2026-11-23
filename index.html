@@ -322,6 +322,15 @@
   version: 8,
 
   sources: {
+    basemap: {
+      type: "raster",
+      tiles: [
+        "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+      ],
+      tileSize: 256,
+      attribution: "© OpenStreetMap contributors"
+    },
+
     tracts: {
       type: "vector",
       url: "pmtiles://" + tractURL
@@ -335,11 +344,9 @@
 
   layers: [
     {
-      id: "background",
-      type: "background",
-      paint: {
-        "background-color": "#e8eef2"
-      }
+      id: "basemap",
+      type: "raster",
+      source: "basemap"
     }
   ]
 },
@@ -518,23 +525,22 @@ map.addLayer({
     // ----------------------------------------------------
 
     map.on("click", "ent-provider-points", (e) => {
+  const p = e.features[0].properties;
 
-      const p = e.features[0].properties;
+  const html = `
+    <div>
+      <strong>ENT Provider Location</strong>
+      <br>
+      <strong>Provider Weight:</strong>
+      ${Number(p.provider_weight ?? 0).toFixed(2)}
+    </div>
+  `;
 
-      const popup = `
-        <b>ENT Practice Location</b><br>
-        <b>NPI:</b> ${escapeHTML(p.NPI)}<br>
-        <b>Location ID:</b>
-        ${escapeHTML(p.provider_location_id)}<br>
-        <b>Weighted provider supply:</b>
-        ${formatNumber(p.provider_weight, 4)}
-      `;
-
-      new maplibregl.Popup()
-        .setLngLat(e.lngLat)
-        .setHTML(popup)
-        .addTo(map);
-    });
+  new maplibregl.Popup()
+    .setLngLat(e.lngLat)
+    .setHTML(html)
+    .addTo(map);
+});
 
     // ----------------------------------------------------
     // 8. Cursor changes
@@ -646,5 +652,6 @@ map.addLayer({
 
 </body>
 </html>
+
 
 
