@@ -2,308 +2,612 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>National SPAR and SPAI Map</title>
+  <meta charset="UTF-8">
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1.0">
 
-<link rel="stylesheet"
- href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <title>Nationwide ENT Spatial Accessibility Map</title>
 
-<style>
-  html, body, #map {
-    width: 100%;
-    height: 100%;
-    margin: 0;
-  }
+  <link
+    href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css"
+    rel="stylesheet"
+  />
 
-  .map-control {
-    background: white;
-    padding: 12px;
-    border-radius: 5px;
-    box-shadow: 0 1px 6px #888;
-    font: 13px Arial, sans-serif;
-  }
+  <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+  <script src="https://unpkg.com/pmtiles@3.2.1/dist/pmtiles.js"></script>
 
-  .map-control label {
-    display: block;
-    margin: 7px 0;
-    cursor: pointer;
-  }
+  <style>
+    * { box-sizing: border-box; }
 
-  .legend {
-    background: white;
-    padding: 10px;
-    border-radius: 5px;
-    font: 12px Arial, sans-serif;
-    min-width: 180px;
-    box-shadow: 0 1px 6px #888;
-  }
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+    }
 
-  .legend-bar {
-    height: 14px;
-    margin: 8px 0 5px;
-  }
+    #map {
+      position: absolute;
+      inset: 0;
+    }
 
-  .legend-labels {
-    display: flex;
-    justify-content: space-between;
-  }
+    .panel {
+      position: absolute;
+      z-index: 2;
+      top: 12px;
+      left: 12px;
+      width: 290px;
+      max-width: calc(100vw - 24px);
+      padding: 16px;
+      background: rgba(255,255,255,0.97);
+      border-radius: 9px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.18);
+    }
 
-  .status {
-    position: absolute;
-    bottom: 20px;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 1000;
-    background: white;
-    padding: 10px;
-    font: 13px Arial, sans-serif;
-  }
-</style>
+    .panel h2 {
+      margin: 0 0 8px;
+      font-size: 17px;
+      line-height: 1.3;
+    }
+
+    .subtitle {
+      color: #555;
+      font-size: 12px;
+      line-height: 1.5;
+      margin-bottom: 15px;
+    }
+
+    .section-title {
+      font-size: 12px;
+      font-weight: bold;
+      margin-bottom: 8px;
+    }
+
+    .radio-option {
+      display: block;
+      margin: 9px 0;
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    .checkbox-option {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 13px;
+      margin: 15px 0;
+      cursor: pointer;
+    }
+
+    input {
+      accent-color: #1565c0;
+    }
+
+    .divider {
+      border-top: 1px solid #e5e5e5;
+      margin: 14px 0;
+    }
+
+    .legend-title {
+      font-size: 12px;
+      font-weight: bold;
+      margin-bottom: 9px;
+    }
+
+    .legend-bar {
+      height: 13px;
+      border-radius: 3px;
+      border: 1px solid #ddd;
+    }
+
+    .legend-labels {
+      display: flex;
+      justify-content: space-between;
+      font-size: 10px;
+      color: #444;
+      margin-top: 5px;
+    }
+
+    .missing-key {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 12px;
+      font-size: 11px;
+    }
+
+    .missing-swatch {
+      background: #bdbdbd;
+      width: 14px;
+      height: 14px;
+      border: 1px solid #999;
+    }
+
+    .provider-key {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 10px;
+      font-size: 11px;
+    }
+
+    .provider-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #1565c0;
+    }
+
+    .footnote {
+      margin-top: 14px;
+      font-size: 10px;
+      line-height: 1.5;
+      color: #666;
+    }
+
+    .maplibregl-popup-content {
+      font-size: 12px;
+      line-height: 1.7;
+      border-radius: 6px;
+    }
+
+    @media (max-width: 600px) {
+      .panel {
+        width: 245px;
+        padding: 12px;
+      }
+      .panel h2 { font-size: 14px; }
+    }
+  </style>
 </head>
 
 <body>
-<div id="map"></div>
-<div id="status" class="status">Loading national map...</div>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://unpkg.com/topojson-client@3/dist/topojson-client.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+<div id="map"></div>
+
+<div class="panel">
+
+  <h2>Nationwide ENT Accessibility</h2>
+
+  <div class="subtitle">
+    Spatial Provider Accessibility Index (SPAI)
+    and Spatial Provider Accessibility Ratio (SPAR)
+    across U.S. Census tracts.
+  </div>
+
+  <div class="section-title">Accessibility measure</div>
+
+  <label class="radio-option">
+    <input type="radio" name="measure"
+           value="SPAR" checked>
+    SPAR — Relative accessibility
+  </label>
+
+  <label class="radio-option">
+    <input type="radio" name="measure"
+           value="SPAI">
+    SPAI — Accessibility index
+  </label>
+
+  <div class="divider"></div>
+
+  <label class="checkbox-option">
+    <input type="checkbox" id="providerToggle" checked>
+    Show ENT provider locations
+  </label>
+
+  <div class="divider"></div>
+
+  <div id="legend">
+    <div class="legend-title" id="legendTitle">
+      SPAR (5+ capped)
+    </div>
+
+    <div class="legend-bar" id="legendBar"></div>
+
+    <div class="legend-labels" id="legendLabels"></div>
+  </div>
+
+  <div class="missing-key">
+    <span class="missing-swatch"></span>
+    Isochrone unavailable
+  </div>
+
+  <div class="provider-key">
+    <span class="provider-dot"></span>
+    ENT practice location
+  </div>
+
+  <div class="footnote">
+    Provider dots represent actual geocoded practice
+    locations. Physicians practicing at multiple
+    locations contribute fractional provider supply
+    at each location.
+    <br><br>
+    SPAR is normalized to the population-weighted
+    national mean SPAI. SPAR values above 5 are
+    capped for visualization only.
+  </div>
+
+</div>
 
 <script>
-const map = L.map("map", {
-  preferCanvas: true,
-  zoomControl: true
-}).setView([39.5, -98.5], 4);
+  // ------------------------------------------------------
+  // 1. Register PMTiles protocol
+  // ------------------------------------------------------
 
-L.tileLayer(
-  "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-  {
-    attribution: '&copy; OpenStreetMap contributors',
-    maxZoom: 19
-  }
-).addTo(map);
+  const protocol = new pmtiles.Protocol();
+  maplibregl.addProtocol("pmtiles", protocol.tile);
 
-let currentLayer = "SPAR";
-let tractLayer;
-let providerLayer = L.layerGroup().addTo(map);
-let showProviders = true;
-let spaiMax = 1;
+  const tractURL = new URL(
+    "./national-tracts.pmtiles",
+    window.location.href
+  ).href;
 
-function numeric(value) {
-  return Number(value);
-}
+  const providerURL = new URL(
+    "./ent-providers.pmtiles",
+    window.location.href
+  ).href;
 
-function getColor(value, type) {
-  if (value === null || value === undefined ||
-      !Number.isFinite(numeric(value))) {
-    return "transparent";
-  }
+  // ------------------------------------------------------
+  // 2. Color scales
+  // ------------------------------------------------------
 
-  if (type === "SPAR") {
-    const scaled = Math.max(0, Math.min(numeric(value), 5)) / 5;
-    return d3.interpolateViridis(scaled);
-  }
+  const viridis = [
+    "#440154",
+    "#414487",
+    "#2a788e",
+    "#22a884",
+    "#7ad151",
+    "#fde725"
+  ];
 
-  const scaled = Math.max(0, Math.min(numeric(value) / spaiMax, 1));
-  return d3.interpolateMagma(scaled);
-}
+  const magma = [
+    "#000004",
+    "#3b0f70",
+    "#8c2981",
+    "#de4968",
+    "#fe9f6d",
+    "#fcfdbf"
+  ];
 
-function tractStyle(feature) {
-  const p = feature.properties;
+  // SPAR: cap at 5
+  const sparColor = [
+    "interpolate", ["linear"],
+    ["min", ["to-number", ["get", "SPAR"], 0], 5],
+    0, viridis[0],
+    1, viridis[1],
+    2, viridis[2],
+    3, viridis[3],
+    4, viridis[4],
+    5, viridis[5]
+  ];
 
-  return {
-    color: "#ffffff",
-    weight: 0.25,
-    opacity: 0.65,
-    fillColor: getColor(p[currentLayer], currentLayer),
-    fillOpacity: 0.8
-  };
-}
+  // SPAI: visualization range 0 to 10 x 10^-5.
+  // Values above the maximum use the final color.
+  // Original SPAI values are not changed.
+  const spaiMax = 1e-4;
 
-function formatSPAI(value) {
-  if (value == null) return "NA";
-  return Number(value).toExponential(3);
-}
+  const spaiColor = [
+    "interpolate", ["linear"],
+    ["min", ["to-number", ["get", "SPAI"], 0], spaiMax],
+    0, magma[0],
+    spaiMax * 0.2, magma[1],
+    spaiMax * 0.4, magma[2],
+    spaiMax * 0.6, magma[3],
+    spaiMax * 0.8, magma[4],
+    spaiMax, magma[5]
+  ];
 
-function tractPopup(feature) {
-  const p = feature.properties;
+  // Gray for missing isochrones or accessibility values.
+  const missingColor = "#bdbdbd";
 
-  return `
-    <b>FIPS Code:</b> ${p.FIPS}<br>
-    <b>SPAR:</b> ${Number(p.SPAR).toFixed(2)}<br>
-    <b>SPAI:</b> ${formatSPAI(p.SPAI)}<br>
-    <b>Census Tract Population:</b>
-    ${Number(p.POPULATION).toLocaleString()}
-  `;
-}
-
-// Layer controls
-const layerControl = L.control({position: "topleft"});
-
-layerControl.onAdd = function() {
-  const div = L.DomUtil.create("div", "map-control");
-
-  div.innerHTML = `
-    <b>Accessibility Measure</b>
-    <label><input type="radio" name="measure"
-      value="SPAR" checked> SPAR</label>
-    <label><input type="radio" name="measure"
-      value="SPAI"> SPAI</label>
-    <hr>
-    <label><input type="checkbox" id="providersToggle"
-      checked> Provider locations</label>
-  `;
-
-  L.DomEvent.disableClickPropagation(div);
-  L.DomEvent.disableScrollPropagation(div);
-
-  div.querySelectorAll('input[name="measure"]').forEach(input => {
-    input.addEventListener("change", function() {
-      currentLayer = this.value;
-
-      if (tractLayer) {
-        tractLayer.setStyle(tractStyle);
-      }
-
-      updateLegend();
-    });
-  });
-
-  div.querySelector("#providersToggle").addEventListener(
-    "change", function() {
-      showProviders = this.checked;
-
-      if (showProviders) {
-        providerLayer.addTo(map);
-      } else {
-        map.removeLayer(providerLayer);
-      }
-    }
-  );
-
-  return div;
-};
-
-layerControl.addTo(map);
-
-// Dynamic legend
-const legend = L.control({position: "topright"});
-let legendDiv;
-
-legend.onAdd = function() {
-  legendDiv = L.DomUtil.create("div", "legend");
-  updateLegend();
-  return legendDiv;
-};
-
-legend.addTo(map);
-
-function updateLegend() {
-  if (!legendDiv) return;
-
-  const isSPAR = currentLayer === "SPAR";
-  const maxValue = isSPAR ? 5 : spaiMax;
-  const palette = isSPAR ? d3.interpolateViridis : d3.interpolateMagma;
-
-  const colors = Array.from(
-    {length: 101},
-    (_, i) => palette(i / 100)
-  );
-
-  const gradient = `linear-gradient(to right, ${colors.join(",")})`;
-
-  let labels;
-
-  if (isSPAR) {
-    labels = ["0", "1", "2", "3", "4", "5+"];
-  } else {
-    labels = [0, 0.25, 0.5, 0.75, 1].map(
-      x => (x * maxValue * 1e5).toFixed(2)
-    );
+  function accessibilityColor(measure) {
+    return [
+      "case",
+      ["!=", ["get", "ISOCHRONE_AVAILABLE"], true],
+      missingColor,
+      ["==", ["get", measure], null],
+      missingColor,
+      measure === "SPAR" ? sparColor : spaiColor
+    ];
   }
 
-  legendDiv.innerHTML = `
-    <b>${isSPAR ? "SPAR (5+ capped)" : "SPAI (× 10⁻⁵)"}</b>
-    <div class="legend-bar" style="background:${gradient}"></div>
-    <div class="legend-labels">
-      ${labels.map(x => `<span>${x}</span>`).join("")}
-    </div>
-  `;
-}
+  // ------------------------------------------------------
+  // 3. Initialize map
+  // ------------------------------------------------------
 
-// Load national tract data
-fetch("data/tracts.topojson")
-  .then(response => {
-    if (!response.ok) throw new Error("Cannot load tracts.topojson");
-    return response.json();
-  })
-  .then(topology => {
-    const objectName = Object.keys(topology.objects)[0];
+  const map = new maplibregl.Map({
+    container: "map",
 
-    const geojson = topojson.feature(
-      topology,
-      topology.objects[objectName]
-    );
+    style: {
+      version: 8,
 
-    // Use the full SPAI range, matching the original palette
-    spaiMax = Math.max(
-      ...geojson.features.map(f => Number(f.properties.SPAI) || 0)
-    );
+      sources: {
+        basemap: {
+          type: "raster",
+          tiles: [
+            "https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png",
+            "https://b.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png",
+            "https://c.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png"
+          ],
+          tileSize: 256,
+          attribution: "© OpenStreetMap contributors © CARTO"
+        },
 
-    if (spaiMax <= 0) spaiMax = 1;
+        tracts: {
+          type: "vector",
+          url: "pmtiles://" + tractURL
+        },
 
-    tractLayer = L.geoJSON(geojson, {
-      renderer: L.canvas({padding: 0.5}),
-      style: tractStyle,
-      onEachFeature: function(feature, layer) {
-        layer.bindPopup(() => tractPopup(feature));
-      }
-    }).addTo(map);
-
-    updateLegend();
-
-    document.getElementById("status").style.display = "none";
-  })
-  .catch(error => {
-    document.getElementById("status").textContent =
-      "Error loading tract data: " + error.message;
-    console.error(error);
-  });
-
-// Load provider locations
-fetch("data/providers.geojson")
-  .then(response => {
-    if (!response.ok) throw new Error("Cannot load providers.geojson");
-    return response.json();
-  })
-  .then(geojson => {
-    providerLayer = L.geoJSON(geojson, {
-      pointToLayer: function(feature, latlng) {
-        return L.circleMarker(latlng, {
-          radius: 4,
-          color: "blue",
-          stroke: false,
-          fillOpacity: 0.8,
-          renderer: L.canvas()
-        });
+        providers: {
+          type: "vector",
+          url: "pmtiles://" + providerURL
+        }
       },
-      onEachFeature: function(feature, layer) {
-        const p = feature.properties;
 
-        layer.bindPopup(`
-          <b>Provider Location</b><br>
-          <b>FIPS Tract:</b> ${p.GEOID}<br>
-          <b>Weighted Provider Count:</b>
-          ${Number(p.weighted_provider_count).toFixed(3)}
-        `);
+      layers: [
+        {
+          id: "basemap",
+          type: "raster",
+          source: "basemap"
+        }
+      ]
+    },
+
+    center: [-98.5, 39.5],
+    zoom: 3.5,
+    minZoom: 2,
+    maxZoom: 14
+  });
+
+  map.addControl(
+    new maplibregl.NavigationControl(),
+    "top-right"
+  );
+
+  // ------------------------------------------------------
+  // 4. HTML formatting helpers
+  // ------------------------------------------------------
+
+  function escapeHTML(value) {
+    return String(value ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+
+  function formatNumber(value, digits = 2) {
+    if (value === null || value === undefined ||
+        value === "" || !Number.isFinite(Number(value))) {
+      return "Unavailable";
+    }
+    return Number(value).toLocaleString("en-US", {
+      maximumFractionDigits: digits
+    });
+  }
+
+  function formatSPAI(value) {
+    if (value === null || value === undefined ||
+        !Number.isFinite(Number(value))) {
+      return "Unavailable";
+    }
+    return Number(value).toExponential(4);
+  }
+
+  // ------------------------------------------------------
+  // 5. Add vector layers
+  // ------------------------------------------------------
+
+  map.on("load", () => {
+
+    map.addLayer({
+      id: "tract-fill",
+      type: "fill",
+      source: "tracts",
+      "source-layer": "tracts",
+      paint: {
+        "fill-color": accessibilityColor("SPAR"),
+        "fill-opacity": 0.75
       }
     });
 
-    if (showProviders) providerLayer.addTo(map);
-  })
-  .catch(console.error);
+    map.addLayer({
+      id: "tract-outline",
+      type: "line",
+      source: "tracts",
+      "source-layer": "tracts",
+      minzoom: 6,
+      paint: {
+        "line-color": "#ffffff",
+        "line-width": 0.4,
+        "line-opacity": 0.65
+      }
+    });
+
+    map.addLayer({
+      id: "ent-provider-points",
+      type: "circle",
+      source: "providers",
+      "source-layer": "providers",
+
+      paint: {
+        "circle-color": "#1565c0",
+        "circle-radius": [
+          "interpolate", ["linear"], ["zoom"],
+          3, 2,
+          7, 3,
+          11, 5
+        ],
+        "circle-opacity": 0.85,
+        "circle-stroke-color": "#ffffff",
+        "circle-stroke-width": 0.5
+      }
+    });
+
+    // ----------------------------------------------------
+    // 6. Tract popups
+    // ----------------------------------------------------
+
+    map.on("click", "tract-fill", (e) => {
+
+      const p = e.features[0].properties;
+
+      const available =
+        p.ISOCHRONE_AVAILABLE === true ||
+        p.ISOCHRONE_AVAILABLE === "true" ||
+        p.ISOCHRONE_AVAILABLE === 1 ||
+        p.ISOCHRONE_AVAILABLE === "1";
+
+      const popup = `
+        <b>Census Tract</b><br>
+        <b>FIPS:</b> ${escapeHTML(p.FIPS)}<br>
+        <b>Population:</b>
+        ${formatNumber(p.POPULATION, 0)}<br>
+        <b>SPAR:</b>
+        ${available ? formatNumber(p.SPAR, 4) : "Unavailable"}<br>
+        <b>SPAI:</b>
+        ${available ? formatSPAI(p.SPAI) : "Unavailable"}<br>
+        <b>Isochrone available:</b>
+        ${available ? "Yes" : "No"}
+      `;
+
+      new maplibregl.Popup()
+        .setLngLat(e.lngLat)
+        .setHTML(popup)
+        .addTo(map);
+    });
+
+    // ----------------------------------------------------
+    // 7. Provider popups
+    // ----------------------------------------------------
+
+    map.on("click", "ent-provider-points", (e) => {
+
+      const p = e.features[0].properties;
+
+      const popup = `
+        <b>ENT Practice Location</b><br>
+        <b>NPI:</b> ${escapeHTML(p.NPI)}<br>
+        <b>Location ID:</b>
+        ${escapeHTML(p.provider_location_id)}<br>
+        <b>Weighted provider supply:</b>
+        ${formatNumber(p.provider_weight, 4)}
+      `;
+
+      new maplibregl.Popup()
+        .setLngLat(e.lngLat)
+        .setHTML(popup)
+        .addTo(map);
+    });
+
+    // ----------------------------------------------------
+    // 8. Cursor changes
+    // ----------------------------------------------------
+
+    ["tract-fill", "ent-provider-points"].forEach(id => {
+      map.on("mouseenter", id, () => {
+        map.getCanvas().style.cursor = "pointer";
+      });
+
+      map.on("mouseleave", id, () => {
+        map.getCanvas().style.cursor = "";
+      });
+    });
+
+    // ----------------------------------------------------
+    // 9. SPAR / SPAI toggle
+    // ----------------------------------------------------
+
+    document.querySelectorAll(
+      'input[name="measure"]'
+    ).forEach(radio => {
+
+      radio.addEventListener("change", (event) => {
+
+        const measure = event.target.value;
+
+        map.setPaintProperty(
+          "tract-fill",
+          "fill-color",
+          accessibilityColor(measure)
+        );
+
+        updateLegend(measure);
+      });
+    });
+
+    // ----------------------------------------------------
+    // 10. Provider visibility toggle
+    // ----------------------------------------------------
+
+    document.getElementById(
+      "providerToggle"
+    ).addEventListener("change", (event) => {
+
+      map.setLayoutProperty(
+        "ent-provider-points",
+        "visibility",
+        event.target.checked ? "visible" : "none"
+      );
+    });
+
+    updateLegend("SPAR");
+  });
+
+  // ------------------------------------------------------
+  // 11. Dynamic legend
+  // ------------------------------------------------------
+
+  function updateLegend(measure) {
+
+    const title = document.getElementById("legendTitle");
+    const bar = document.getElementById("legendBar");
+    const labels = document.getElementById("legendLabels");
+
+    if (measure === "SPAR") {
+
+      title.textContent = "SPAR (5+ capped)";
+
+      bar.style.background =
+        "linear-gradient(to right, " +
+        viridis.join(", ") + ")";
+
+      labels.innerHTML =
+        "<span>0</span>" +
+        "<span>1</span>" +
+        "<span>2</span>" +
+        "<span>3</span>" +
+        "<span>4</span>" +
+        "<span>5+</span>";
+
+    } else {
+
+      title.textContent = "SPAI (× 10⁻⁵; 10+ capped)";
+
+      bar.style.background =
+        "linear-gradient(to right, " +
+        magma.join(", ") + ")";
+
+      labels.innerHTML =
+        "<span>0</span>" +
+        "<span>2</span>" +
+        "<span>4</span>" +
+        "<span>6</span>" +
+        "<span>8</span>" +
+        "<span>10+</span>";
+    }
+  }
+
+  // ------------------------------------------------------
+  // 12. Report loading errors for debugging
+  // ------------------------------------------------------
+
+  map.on("error", (e) => {
+    console.error("Map loading error:", e.error || e);
+  });
+
 </script>
+
 </body>
 </html>
-
