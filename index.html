@@ -176,16 +176,27 @@
   <div class="section-title">Accessibility measure</div>
 
   <label class="radio-option">
-    <input type="radio" name="measure"
-           value="SPAR" checked>
-    SPAR — Relative accessibility
-  </label>
+  <input type="radio" name="measure"
+         value="SPAR" checked>
+  SPAR — Relative accessibility
+</label>
 
-  <label class="radio-option">
-    <input type="radio" name="measure"
-           value="SPAI">
-    SPAI — Accessibility index
-  </label>
+<label class="radio-option">
+  <input type="radio" name="measure"
+         value="SPAI">
+  SPAI — Accessibility index
+</label>
+
+<!-- Boundary toggles -->
+<label class="radio-option">
+  <input type="checkbox" id="stateBordersToggle">
+  Show state boundaries
+</label>
+
+<label class="radio-option">
+  <input type="checkbox" id="tractBordersToggle">
+  Show census tract boundaries
+</label>
 
   <div class="divider"></div>
 
@@ -421,6 +432,10 @@ map.addLayer({
   source: "tracts",
   "source-layer": "tracts",
 
+  layout: {
+    visibility: "none"
+  },
+
   paint: {
     "line-color": "#FFFFFF",
 
@@ -438,7 +453,8 @@ map.addLayer({
   }
 });
 
-    map.addSource("states", {
+// 3. White state outlines
+map.addSource("states", {
   type: "geojson",
   data: "./states.geojson"
 });
@@ -447,8 +463,14 @@ map.addLayer({
   id: "state-outline",
   type: "line",
   source: "states",
+
+  layout: {
+    visibility: "none"
+  },
+
   paint: {
     "line-color": "#FFFFFF",
+
     "line-width": [
       "interpolate",
       ["linear"],
@@ -457,10 +479,10 @@ map.addLayer({
       6, 1.5,
       10, 2
     ],
+
     "line-opacity": 1
   }
 });
-
 // 3. Blue ENT provider locations
 map.addLayer({
   id: "ent-provider-points",
@@ -586,6 +608,34 @@ map.addLayer({
         updateLegend(measure);
       });
     });
+
+    // ----------------------------------------------------
+// State and census tract boundary toggles
+// ----------------------------------------------------
+
+// State boundaries
+document.getElementById("stateBordersToggle")
+  .addEventListener("change", function() {
+
+    map.setLayoutProperty(
+      "state-outline",
+      "visibility",
+      this.checked ? "visible" : "none"
+    );
+
+  });
+
+// Census tract boundaries
+document.getElementById("tractBordersToggle")
+  .addEventListener("change", function() {
+
+    map.setLayoutProperty(
+      "tract-outline",
+      "visibility",
+      this.checked ? "visible" : "none"
+    );
+
+  });
 
     // ----------------------------------------------------
     // 10. Provider visibility toggle
