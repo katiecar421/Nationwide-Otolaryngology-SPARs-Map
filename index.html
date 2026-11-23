@@ -431,6 +431,28 @@ map.addLayer({
   }
 });
 
+    map.addSource("states", {
+  type: "geojson",
+  data: "./states.geojson"
+});
+
+map.addLayer({
+  id: "state-outline",
+  type: "line",
+  source: "states",
+  paint: {
+    "line-color": "#FFFFFF",
+    "line-width": [
+      "interpolate",
+      ["linear"],
+      ["zoom"],
+      3, 1,
+      6, 1.5,
+      10, 2
+    ],
+    "line-opacity": 1
+  }
+});
 
 // 3. Blue ENT provider locations
 map.addLayer({
@@ -624,4 +646,5 @@ map.addLayer({
 
 </body>
 </html>
+
 
